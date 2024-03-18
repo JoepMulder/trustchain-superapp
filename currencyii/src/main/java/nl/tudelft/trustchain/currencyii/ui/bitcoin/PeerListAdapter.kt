@@ -40,13 +40,15 @@ class PeerListAdapter(
 
         val ipv4 = binding.ipv4
         var last_request = binding.lastRequest;
-        var last_response = binding.lastResponse
+        var last_response = binding.lastResponse;
+        var public_key = binding.publicKey
 
 
 
         ipv4.text = peer.address.ip
         last_request.text = peer.lastRequest?.let { formatter.format(it) };
         last_response.text = peer.lastResponse?.let { formatter.format(it) };
+        public_key.text = peer.publicKey.toString();
 
 
         return view

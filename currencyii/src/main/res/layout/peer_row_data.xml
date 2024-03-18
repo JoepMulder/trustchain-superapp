@@ -39,6 +39,11 @@
                     android:layout_height="wrap_content"
                     android:paddingRight="10dp"
                     android:text="Last request:" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingRight="10dp"
+                    android:text="Public key: " />
 
 
 
@@ -63,6 +68,12 @@
                     android:text="text" />
                 <TextView
                     android:id="@+id/last_request"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:text="text" />
+                <TextView
+                    android:id="@+id/public_key"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
