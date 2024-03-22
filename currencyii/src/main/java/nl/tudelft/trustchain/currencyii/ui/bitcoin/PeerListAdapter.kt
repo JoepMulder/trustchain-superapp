@@ -1,5 +1,6 @@
 package nl.tudelft.trustchain.currencyii.ui.bitcoin
 
+import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
@@ -16,11 +17,14 @@ import nl.tudelft.trustchain.currencyii.ui.BaseFragment
 import nl.tudelft.trustchain.currencyii.util.taproot.CTransaction
 import org.bitcoinj.core.Coin
 import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 
 class PeerListAdapter(
     private val context: BaseFragment,
-    private val items: List<Peer>
+    private var items: List<Peer>
 ) : BaseAdapter() {
+
     override fun getView(
         p0: Int,
         p1: View?,
@@ -39,11 +43,10 @@ class PeerListAdapter(
         val formatter = SimpleDateFormat("dd-MM-yyyy HH:mm")
 
         val ipv4 = binding.ipv4
-        var last_request = binding.lastRequest;
-        var last_response = binding.lastResponse;
-        var public_key = binding.publicKey
-
-
+        val last_request = binding.lastRequest;
+        val last_response = binding.lastResponse;
+        val public_key = binding.publicKey
+        var ping_icon = binding.pingIcon
 
         ipv4.text = peer.address.ip
         last_request.text = peer.lastRequest?.let { formatter.format(it) };
@@ -51,10 +54,12 @@ class PeerListAdapter(
         public_key.text = peer.publicKey.toString();
 
 
+        val color = if (peer.lastResponse != null && peer.lastResponse!!.time + 3000 > Calendar.getInstance().timeInMillis) Color.GREEN else Color.RED;
+        ping_icon.setColorFilter(color)
+
+
         return view
     }
-
-
 
     override fun getItem(p0: Int): Any {
         return items[p0]
@@ -66,5 +71,9 @@ class PeerListAdapter(
 
     override fun getCount(): Int {
         return items.size
+    }
+
+    fun updateItems(peers: List<Peer>) {
+        this.items = peers;
     }
 }
