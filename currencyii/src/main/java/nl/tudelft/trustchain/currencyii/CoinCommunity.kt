@@ -3,20 +3,31 @@ package nl.tudelft.trustchain.currencyii
 import android.app.Activity
 import android.content.Context
 import nl.tudelft.ipv8.Community
+import nl.tudelft.ipv8.Peer
 import nl.tudelft.ipv8.android.IPv8Android
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainCommunity
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
+import nl.tudelft.ipv8.keyvault.PrivateKey
+import nl.tudelft.ipv8.messaging.Packet
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
+import nl.tudelft.trustchain.currencyii.payload.*
 import nl.tudelft.trustchain.currencyii.sharedWallet.*
 import nl.tudelft.trustchain.currencyii.util.DAOCreateHelper
 import nl.tudelft.trustchain.currencyii.util.DAOJoinHelper
 import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
+import nl.tudelft.trustchain.currencyii.util.LeaderElectionHelper
 
 @Suppress("UNCHECKED_CAST")
 class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc8db5899c5df5b") : Community() {
     override val serviceId = serviceId
+
+    init {
+        messageHandlers[MessageId.ELECTION_REQUEST] = :: onElectionRequestPacket
+        messageHandlers[MessageId.ELECTED_RESPONSE] = :: onElectedResponsePacket
+        messageHandlers[MessageId.ALIVE_RESPONSE] = :: onAliveResponsePacket
+    }
 
     private fun getTrustChainCommunity(): TrustChainCommunity {
         return IPv8Android.getInstance().getOverlay()
@@ -26,6 +37,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
     private val daoCreateHelper = DAOCreateHelper()
     private val daoJoinHelper = DAOJoinHelper()
     private val daoTransferFundsHelper = DAOTransferFundsHelper()
+    private val leaderElectionHelper = LeaderElectionHelper()
 
     /**
      * Create a bitcoin genesis wallet and broadcast the result on trust chain.
@@ -204,7 +216,48 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
 
         return "invalid-pk"
     }
+    fun sendPayload(peer: Peer, payload: ByteArray) {
+        send(peer, payload)
+    }
+    internal fun createElectionRequest(
+        dAOid: String,
+    ): ByteArray {
+        val payload = ElectionPayload(dAOid.toByteArray())
+        return serializePacket(MessageId.ELECTION_REQUEST, payload)
+    }
 
+    internal fun createElectedResponse(
+        dAOid: String,
+    ): ByteArray {
+        val payload = ElectedPayload(dAOid.toByteArray())
+        return serializePacket(MessageId.ELECTED_RESPONSE, payload)
+    }
+
+    internal fun createAliveResponse(
+        dAOid: String,
+    ): ByteArray {
+        val payload = AlivePayload(dAOid.toByteArray())
+        return serializePacket(MessageId.ALIVE_RESPONSE, payload)
+    }
+
+    private fun onAliveResponsePacket(packet: Packet){
+        val (peer, payload) = packet.getDecryptedAuthPayload(
+            AlivePayload.Deserializer, myPeer.key as PrivateKey
+        )
+        leaderElectionHelper.onAliveResponse(peer, payload)
+    }
+    private fun onElectedResponsePacket(packet: Packet){
+        val (peer, payload) = packet.getDecryptedAuthPayload(
+            ElectedPayload.Deserializer, myPeer.key as PrivateKey
+        )
+        leaderElectionHelper.onElectedResponse(peer, payload)
+    }
+    private fun onElectionRequestPacket(packet: Packet){
+        val (peer, payload) = packet.getDecryptedAuthPayload(
+            ElectionPayload.Deserializer, myPeer.key as PrivateKey
+        )
+        leaderElectionHelper.onElectionRequest(peer, payload, getPeers(), myPeer.address)
+    }
     fun fetchSignatureRequestProposalId(block: TrustChainBlock): String {
         if (block.type == SIGNATURE_ASK_BLOCK) {
             return SWSignatureAskTransactionData(block.transaction).getData().SW_UNIQUE_PROPOSAL_ID
@@ -274,6 +327,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
                 SWResponseNegativeSignatureTransactionData(it.transaction).getData()
             }
     }
+
 
     /**
      * Given a shared wallet proposal block, calculate the signature and respond with a trust chain block.
@@ -390,6 +444,12 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
 
         return requiredVotes <= totalVoters.size - againstSignatures.size
     }
+    object MessageId {
+        const val ELECTION_REQUEST = 1
+        const val ELECTED_RESPONSE = 2
+        const val ALIVE_RESPONSE = 3
+    }
+
 
     companion object {
         // Default maximum wait timeout for bitcoin transaction broadcasts in seconds
