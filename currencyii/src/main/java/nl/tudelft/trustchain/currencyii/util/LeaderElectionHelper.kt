@@ -1,11 +1,15 @@
 package nl.tudelft.trustchain.currencyii.util
 
+import android.util.Log
 import nl.tudelft.ipv8.IPv4Address
 import nl.tudelft.ipv8.Peer
 import nl.tudelft.trustchain.currencyii.payload.ElectionPayload
 import nl.tudelft.trustchain.currencyii.CoinCommunity
+import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.payload.AlivePayload
 import nl.tudelft.trustchain.currencyii.payload.ElectedPayload
+import nl.tudelft.trustchain.currencyii.payload.SignPayload
+
 
 class LeaderElectionHelper {
 
@@ -27,7 +31,7 @@ class LeaderElectionHelper {
         }
 
         if(higherPeers.isEmpty()) {
-            val electedPayload = coinCommunity.createElectedResponse(payload.toString())
+            val electedPayload = coinCommunity.createElectedResponse(payload.toString(), coinCommunity.myPeer)
             coinCommunity.sendPayload(peer, electedPayload)
             leader = coinCommunity.myPeer
             return
@@ -36,9 +40,9 @@ class LeaderElectionHelper {
         var i = 0
         for (p in higherPeers) {
             // Send election request to the peer with the highest hash
-            val generateedPayload = coinCommunity.createElectionRequest(payload.toString())
+            val generatedPayload = coinCommunity.createElectionRequest(payload.toString())
             i++
-            coinCommunity.sendPayload(p, generateedPayload)
+            coinCommunity.sendPayload(p, generatedPayload)
             if(i == higherPeers.size) {
                 lastTime = System.currentTimeMillis()
             }
@@ -47,9 +51,9 @@ class LeaderElectionHelper {
             // Wait for responses
         }
         if(responses.isNotEmpty()){
-            val electedPayload = coinCommunity.createElectedResponse(payload.toString())
-            coinCommunity.sendPayload(peer, electedPayload)
             leader = coinCommunity.myPeer
+            val electedPayload = coinCommunity.createElectedResponse(payload.toString(), leader!!)
+            coinCommunity.sendPayload(peer, electedPayload)
         }
 
     }
@@ -58,7 +62,51 @@ class LeaderElectionHelper {
     }
 
     fun onElectedResponse(peer:Peer, payload: ElectedPayload) {
-        leader = peer
+
+        val pair = ElectedPayload.deserializeBytes(payload.serialize(), 0)
+        Log.d("LEADER", "Elected: " + pair.second.toString())
+        leader = pair.second
+    //        if (!this.checkLeaderExists()) {
+//            leader = pair.second
+//        }
+//        else if (!checkIsLeader(pair.second)) {
+//            coinCommunity.sendPayload(leader!!, AlivePayload(AlivePayload.deserializeBytes(payload.serialize(), 0).toString().toByteArray()).serialize())
+//        }
+
+
+    }
+    fun checkIsLeader(peer:Peer): Boolean {
+        return if (this.checkLeaderExists()) {
+            false
+        } else {
+            leader!!.address.equals(peer.address)
+        }
+    }
+    fun checkLeaderExists(): Boolean {
+        return leader != null
+    }
+    fun sendProposalToLeader(payload: SignPayload) {
+        this.leader?.let { coinCommunity.sendPayload(this.leader!!, payload.serialize()) }
+    }
+
+    fun onLeaderSignProposal(payload: SignPayload) {
+        // Current peer is the leader and will sign the proposal
+        // Create a new shared wallet using the signatures of the others.
+        // Broadcast the new shared bitcoin wallet on trust chain.
+//        try {
+//            this.joinBitcoinWallet(
+//                mostRecentSWBlock.transaction,
+//                proposeBlockData,
+//                signatures,
+//                context
+//            )
+//            // Add new nonceKey after joining a DAO
+//            WalletManagerAndroid.getInstance()
+//                .addNewNonceKey(proposeBlockData.SW_UNIQUE_ID, context)
+//        } catch (t: Throwable) {
+////                Log.e("Coin", "Joining failed. ${t.message ?: "No further information"}.")
+//        }
     }
 
 }
+

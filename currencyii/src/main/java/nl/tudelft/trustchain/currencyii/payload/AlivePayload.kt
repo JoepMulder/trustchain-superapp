@@ -1,6 +1,9 @@
 package nl.tudelft.trustchain.currencyii.payload
 
+import nl.tudelft.ipv8.Peer
 import nl.tudelft.ipv8.messaging.*
+import java.io.ByteArrayInputStream
+import java.io.ObjectInputStream
 
 class AlivePayload(
     val DAOid: ByteArray,
@@ -20,6 +23,17 @@ class AlivePayload(
             val publicKey = buffer.copyOfRange(offset + localOffset, offset + localOffset + payloadSize)
             localOffset += payloadSize
             return Pair(AlivePayload(publicKey), localOffset)
+        }
+        fun deserializeBytes(buffer: ByteArray, offset: Int): Integer {
+            val pair = AlivePayload.deserialize(buffer, offset)
+            val daoIdBytes = pair.first.DAOid
+
+            val daoId = ByteArrayInputStream(daoIdBytes).use { bis ->
+                ObjectInputStream(bis).use { ois ->
+                    ois.readObject() as Integer
+                }
+            }
+            return daoId
         }
     }
 }
