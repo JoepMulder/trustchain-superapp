@@ -11,6 +11,7 @@ import nl.tudelft.ipv8.attestation.trustchain.TrustChainCommunity
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
 import nl.tudelft.ipv8.keyvault.PrivateKey
 import nl.tudelft.ipv8.messaging.Packet
+import nl.tudelft.ipv8.peerdiscovery.Network
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
 import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
@@ -244,13 +245,13 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         return serializePacket(MessageId.ALIVE_RESPONSE, payload)
     }
 
-    private fun onAliveResponsePacket(packet: Packet){
+    fun onAliveResponsePacket(packet: Packet){
         val (peer, payload) = packet.getDecryptedAuthPayload(
             AlivePayload.Deserializer, myPeer.key as PrivateKey
         )
         this.onAliveResponse(peer, payload)
     }
-    private fun onAliveResponse(peer: Peer, payload: AlivePayload) {
+    fun onAliveResponse(peer: Peer, payload: AlivePayload) {
         this.candidates[payload.DAOid]?.add(peer)
     }
     private fun onElectedResponsePacket(packet: Packet){
@@ -322,6 +323,10 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         this.myPeer
 
     }
+    fun getCandidates(): HashMap<ByteArray, ArrayList<Peer>> {
+        return this.candidates
+    }
+
     fun leaderSignProposal(
         mostRecentSWBlock: TrustChainBlock,
         proposeBlockData: SWSignatureAskBlockTD,
