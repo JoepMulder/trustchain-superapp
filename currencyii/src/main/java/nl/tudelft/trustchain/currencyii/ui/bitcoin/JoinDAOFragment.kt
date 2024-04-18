@@ -230,7 +230,8 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
             mostRecentSWBlock,
             proposeBlockData,
             signatures,
-            context)
+            context,
+            block.linkPublicKey)
 //        try {
 //            getCoinCommunity().joinBitcoinWallet(
 //                mostRecentSWBlock.transaction,

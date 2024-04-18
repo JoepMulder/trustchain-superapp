@@ -25,7 +25,8 @@ import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
 class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc8db5899c5df5b") : Community() {
     override val serviceId = serviceId
     private var current_leader: Peer? = null
-    private val candidates: ArrayList<Peer> = ArrayList<Peer>()
+    private var candidates: HashMap<ByteArray, ArrayList<Peer>> = HashMap()
+
     init {
         messageHandlers[MessageId.ELECTION_REQUEST] = :: onElectionRequestPacket
         messageHandlers[MessageId.ELECTED_RESPONSE] = :: onElectedResponsePacket
@@ -223,24 +224,23 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         send(peer, payload)
     }
     internal fun createElectionRequest(
-        dAOid: String,
+        dAOid: ByteArray,
     ): ByteArray {
-        val payload = ElectionPayload(dAOid.toByteArray())
+        val payload = ElectionPayload(dAOid)
         return serializePacket(MessageId.ELECTION_REQUEST, payload)
     }
 
     internal fun createElectedResponse(
-        dAOid: String,
-        leader: Peer,
+        dAOid: ByteArray,
     ): ByteArray {
-        val payload = ElectedPayload(dAOid.toByteArray(), leader.address.toString().toByteArray())
+        val payload = ElectedPayload(dAOid)
         return serializePacket(MessageId.ELECTED_RESPONSE, payload)
     }
 
     internal fun createAliveResponse(
-        dAOid: String,
+        dAOid: ByteArray,
     ): ByteArray {
-        val payload = AlivePayload(dAOid.toByteArray())
+        val payload = AlivePayload(dAOid)
         return serializePacket(MessageId.ALIVE_RESPONSE, payload)
     }
 
@@ -251,7 +251,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         this.onAliveResponse(peer, payload)
     }
     private fun onAliveResponse(peer: Peer, payload: AlivePayload) {
-        this.candidates.add(peer)
+        this.candidates[payload.DAOid]?.add(peer)
     }
     private fun onElectedResponsePacket(packet: Packet){
         val (peer, payload) = packet.getDecryptedAuthPayload(
@@ -261,9 +261,9 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
     }
     private fun onElectedResponse(peer: Peer, payload: ElectedPayload) {
         val pair = ElectedPayload.deserializeBytes(payload.serialize(), 0)
-        Log.d("LEADER", "Elected: " + pair.second.toString())
+        Log.d("LEADER", "Elected: " + peer.publicKey)
 
-        this.current_leader = pair.second
+        this.current_leader = peer
     }
 
     private fun onElectionRequestPacket(packet: Packet){
@@ -271,15 +271,18 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
             ElectionPayload.Deserializer, myPeer.key as PrivateKey
         )
         Log.d("Leader", "Election packet received.")
-//        leaderElectionHelper.onElectionRequest(peer, payload, getPeers(), myPeer.address)
+        onElectionRequest(peer, payload)
     }
-    fun onElectionRequest(peer: Peer, payload:ElectedPayload) {
+
+    fun onElectionRequest(peer: Peer, payload:ElectionPayload) {
         Log.d("Leader", "Election started.")
-        val aliveResponse = this.createAliveResponse(payload.toString())
+        val aliveResponse = this.createAliveResponse(payload.DAOid)
         this.sendPayload(peer, aliveResponse)
 
         Log.d("Leader", "Election started.")
-        this.candidates.clear()
+
+        this.candidates[payload.DAOid]  = ArrayList()
+
         this.current_leader = null
 
         val higherPeers = ArrayList<Peer>()
@@ -291,7 +294,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         Log.d("Leader", "peers with higher ips:$higherPeers")
 
         if(higherPeers.isEmpty()) {
-            val electedPayload = this.createElectedResponse(payload.toString(), this.myPeer)
+            val electedPayload = this.createElectedResponse(payload.DAOid)
             this.sendPayload(peer, electedPayload)
             this.current_leader = this.myPeer
             return
@@ -300,7 +303,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         var i = 0
         for (p in higherPeers) {
             // Send election request to the peer with the highest hash
-            val generatedPayload = this.createElectionRequest(payload.toString())
+            val generatedPayload = this.createElectionRequest(payload.DAOid)
             i++
             this.sendPayload(p, generatedPayload)
             if(i == higherPeers.size) {
@@ -310,9 +313,9 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         while (System.currentTimeMillis() - lastTime < 1000) {
             // Wait for responses
         }
-        if(this.candidates.isNotEmpty()){
+        if(this.candidates[payload.DAOid]?.isNotEmpty() == true){
             this.current_leader = this.myPeer
-            val electedPayload = this.createElectedResponse(payload.toString(), this.current_leader!!)
+            val electedPayload = this.createElectedResponse(payload.DAOid)
             this.sendPayload(peer, electedPayload)
         }
 
@@ -323,50 +326,34 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         mostRecentSWBlock: TrustChainBlock,
         proposeBlockData: SWSignatureAskBlockTD,
         signatures: List<SWResponseSignatureBlockTD>,
-        context: Context
+        context: Context,
+        publicKeyBlock: ByteArray
     ) {
-        if (this.checkLeaderExists()) {
-            Log.e("LEADER", "Leader exists")
-            Log.e("LEADER", "sending proposal to leader...")
-            send(current_leader!!,
-                SignPayload(
-                    serviceId.toString().toByteArray(),
-                    mostRecentSWBlock.toString().toByteArray(),
-                    proposeBlockData.toString().toByteArray(),
-                    signatures.toString().toByteArray(),
-                    context.toString().toByteArray()
-                ).serialize()
-            )
-
-
+        Log.e("LEADER", "Leader doesn't exists.")
+        Log.e("LEADER", "Requesting election...")
+        val peers = getPeers()
+        for (peer in peers) {
+            send(peer, this.createElectionRequest(publicKeyBlock))
+            Log.e("LEADER", "Sending to peer at " + peer.address + " in " + serviceId + "...")
         }
-        else {
-
-            Log.e("LEADER", "Leader doesn't exists.")
-            Log.e("LEADER", "Requesting election...")
-            val peers = getPeers()
-            for (peer in peers) {
-                send(peer, this.createElectionRequest(serviceId))
-                Log.e("LEADER", "Sending to peer at " + peer.address + " in " + serviceId + "...")
-            }
-            Log.e("LEADER", "Waiting for leader...")
-            while (!this.checkLeaderExists()) {
-                Thread.sleep(1000)
-            }
-            Log.e("LEADER", "Leader found.")
-            Log.e("LEADER", "sending proposal to leader...")
-            send(this.current_leader!!,
-                SignPayload(
-                    serviceId.toString().toByteArray(),
-                    mostRecentSWBlock.toString().toByteArray(),
-                    proposeBlockData.toString().toByteArray(),
-                    signatures.toString().toByteArray(),
-                    context.toString().toByteArray()
-                ).serialize()
-            )
+        Log.e("LEADER", "Waiting for leader...")
+        while (!this.checkLeaderExists()) {
+            Thread.sleep(1000)
         }
+        Log.e("LEADER", "Leader found.")
+        Log.e("LEADER", "sending proposal to leader...")
+        send(this.current_leader!!,
+            SignPayload(
+                serviceId.toByteArray(),
+                mostRecentSWBlock.toString().toByteArray(),
+                proposeBlockData.toString().toByteArray(),
+                signatures.toString().toByteArray(),
+                context.toString().toByteArray()
+            ).serialize()
+        )
 }
     private fun checkLeaderExists(): Boolean {
+
         return this.current_leader == null
     }
     fun checkIsLeader(me: Peer): Boolean {
