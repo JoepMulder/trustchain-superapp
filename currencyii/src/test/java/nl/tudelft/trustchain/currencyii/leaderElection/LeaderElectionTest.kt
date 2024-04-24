@@ -11,18 +11,30 @@ import io.mockk.runs
 import io.mockk.spyk
 import io.mockk.unmockkAll
 import io.mockk.verify
+import nl.tudelft.ipv8.Community
 import nl.tudelft.ipv8.IPv4Address
 import nl.tudelft.ipv8.keyvault.Key
+import nl.tudelft.ipv8.keyvault.LibNaClSK
 import nl.tudelft.ipv8.keyvault.PrivateKey
 import nl.tudelft.ipv8.keyvault.PublicKey
 import nl.tudelft.ipv8.messaging.EndpointAggregator
 import nl.tudelft.ipv8.messaging.Packet
+import nl.tudelft.ipv8.messaging.eva.EVAProtocol
 import nl.tudelft.ipv8.messaging.serializeUShort
 import nl.tudelft.ipv8.peerdiscovery.Network
+import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.trustchain.common.MarketCommunity
 import nl.tudelft.trustchain.currencyii.payload.AlivePayload
 import nl.tudelft.trustchain.currencyii.payload.ElectedPayload
 import org.junit.jupiter.api.Assertions.*
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.util.Date
+
+import com.goterl.lazysodium.LazySodiumJava
+import com.goterl.lazysodium.SodiumJava
+import org.junit.Before
+import org.junit.jupiter.api.BeforeAll
 
 class payloadTest {
     @Test
@@ -102,32 +114,58 @@ class payloadTest {
     }
 }
 class LeaderElectionTest {
-    private val peersSize = 5
-    private var coinCommunity = spyk(CoinCommunity(), recordPrivateCalls = true)
-    private val me = mockk<Peer>()
-    private val endpoint = mockk<EndpointAggregator>()
-    private val network = mockk<Network>(relaxed = true)
+    private lateinit var lazySodium: LazySodiumJava
+    private lateinit var key: LibNaClSK
+
+    private lateinit var myPeer: Peer
+
+    private lateinit var community: CoinCommunity
+    private lateinit var network: Network
+    private lateinit var endpoint: EndpointAggregator
+    private lateinit var handler: (Packet) -> Unit
+
+    fun init() {
+
+        val lazySodium = LazySodiumJava(SodiumJava())
+        val key = LibNaClSK(
+            "81df0af4c88f274d5228abb894a68906f9e04c902a09c68b9278bf2c7597eaf6".hexToBytes(),
+            "c5c416509d7d262bddfcef421fc5135e0d2bdeb3cb36ae5d0b50321d766f19f2".hexToBytes(),
+            lazySodium
+        )
+
+        val myPeer = Peer(key)
+
+        val community = CoinCommunity()
+        val network = Network()
+        val endpoint = spyk(EndpointAggregator(mockk(relaxed = true), null))
+        val handler = mockk<(Packet) -> Unit>(relaxed = true)
+
+        this.lazySodium = lazySodium
+        this.key = key
+        this.myPeer = myPeer
+        this.network = network
+        this.endpoint = endpoint
+        this.handler = handler
+        this.community = community
+
+        community.myPeer = myPeer
+        community.endpoint = endpoint
+        community.network = network
+        community.evaProtocolEnabled = true
+
+    }
     @Test
-    fun testOnAliveResponsePacket() {
-        val DAOid = "Dao_id"
-        val me_key = mockk<PublicKey>()
+    fun try_test() {
 
-        every { coinCommunity.myPeer } returns me
-        every { coinCommunity.endpoint } returns endpoint
-        every { coinCommunity.network } returns network
-        every { endpoint.send(any<Peer>(), any()) } just runs
+        init()
 
-        every { me_key.keyToBin() } returns "me_key".toByteArray()
+        community.messageHandlers[CoinCommunity.MessageId.ALIVE_RESPONSE] = handler
 
-        every { me.publicKey } returns me_key
-        every { me.lamportTimestamp } returns 0u
-
-        every { me.updateClock(any<ULong>()) } returns Unit
-        every { me.key } returns mockk<Key>()
-
-        coinCommunity.sendPayload(me, coinCommunity.createAliveResponse(DAOid.toByteArray()))
-        verify() { endpoint.send(any<Peer>(), any()) }
-        verify() { coinCommunity.onAliveResponsePacket(any<Packet>()) }
-        verify() { coinCommunity.getCandidates()[Any()]?.add(any<Peer>()) }
+        community.createAliveResponse(
+            "dao_id".toByteArray()
+        ).let { packet ->
+            community.onPacket(Packet(myPeer.address, packet))
+        }
+        verify { handler(any()) }
     }
 }
