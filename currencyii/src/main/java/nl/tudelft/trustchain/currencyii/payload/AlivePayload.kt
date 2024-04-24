@@ -24,16 +24,5 @@ class AlivePayload(
             localOffset += payloadSize
             return Pair(AlivePayload(publicKey), localOffset)
         }
-        fun deserializeBytes(buffer: ByteArray, offset: Int): Integer {
-            val pair = AlivePayload.deserialize(buffer, offset)
-            val daoIdBytes = pair.first.DAOid
-
-            val daoId = ByteArrayInputStream(daoIdBytes).use { bis ->
-                ObjectInputStream(bis).use { ois ->
-                    ois.readObject() as Integer
-                }
-            }
-            return daoId
-        }
     }
 }

@@ -1,40 +1,23 @@
 package nl.tudelft.trustchain.currencyii.leaderElection
 
 import io.mockk.every
-import io.mockk.just
 import nl.tudelft.ipv8.Peer
 import nl.tudelft.trustchain.currencyii.CoinCommunity
 import org.junit.jupiter.api.Test
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.runs
 import io.mockk.spyk
-import io.mockk.unmockkAll
 import io.mockk.verify
-import nl.tudelft.ipv8.Community
-import nl.tudelft.ipv8.IPv4Address
 import nl.tudelft.ipv8.keyvault.Key
 import nl.tudelft.ipv8.keyvault.LibNaClSK
-import nl.tudelft.ipv8.keyvault.PrivateKey
 import nl.tudelft.ipv8.keyvault.PublicKey
 import nl.tudelft.ipv8.messaging.EndpointAggregator
 import nl.tudelft.ipv8.messaging.Packet
-import nl.tudelft.ipv8.messaging.eva.EVAProtocol
-import nl.tudelft.ipv8.messaging.serializeUShort
 import nl.tudelft.ipv8.peerdiscovery.Network
 import nl.tudelft.ipv8.util.hexToBytes
-import nl.tudelft.trustchain.common.MarketCommunity
-import nl.tudelft.trustchain.currencyii.payload.AlivePayload
-import nl.tudelft.trustchain.currencyii.payload.ElectedPayload
 import org.junit.jupiter.api.Assertions.*
-import java.math.BigDecimal
-import java.math.RoundingMode
-import java.util.Date
 
 import com.goterl.lazysodium.LazySodiumJava
 import com.goterl.lazysodium.SodiumJava
-import org.junit.Before
-import org.junit.jupiter.api.BeforeAll
 
 class payloadTest {
     @Test
@@ -155,7 +138,7 @@ class LeaderElectionTest {
 
     }
     @Test
-    fun try_test() {
+    fun onAlivePacketTest() {
 
         init()
 
@@ -167,5 +150,18 @@ class LeaderElectionTest {
             community.onPacket(Packet(myPeer.address, packet))
         }
         verify { handler(any()) }
+    }
+
+    @Test
+    fun handleAlivePacketTest() {
+
+        init()
+        val spykedCommunity = spyk(community)
+        spykedCommunity.createAliveResponse(
+            "dao_id".toByteArray()
+        ).let { packet ->
+            spykedCommunity.onAliveResponsePacket(Packet(myPeer.address, packet))
+        }
+        verify { spykedCommunity.onAliveResponse(any(), any()) }
     }
 }
