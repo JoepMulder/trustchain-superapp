@@ -3,6 +3,7 @@ package nl.tudelft.trustchain.currencyii
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import androidx.core.content.ContentProviderCompat.requireContext
 import nl.tudelft.ipv8.Community
 import nl.tudelft.ipv8.Peer
 import nl.tudelft.ipv8.android.IPv8Android
@@ -13,6 +14,7 @@ import nl.tudelft.ipv8.keyvault.PrivateKey
 import nl.tudelft.ipv8.messaging.Packet
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
+import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.payload.*
 import nl.tudelft.trustchain.currencyii.sharedWallet.*
 import nl.tudelft.trustchain.currencyii.util.DAOCreateHelper
@@ -29,6 +31,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         messageHandlers[MessageId.ELECTION_REQUEST] = ::onElectionRequestPacket
         messageHandlers[MessageId.ELECTED_RESPONSE] = ::onElectedResponsePacket
         messageHandlers[MessageId.ALIVE_RESPONSE] = ::onAliveResponsePacket
+        messageHandlers[MessageId.SIGNATURE_ASK] = ::onSignPayloadResponsePacket
     }
 
     private fun getTrustChainCommunity(): TrustChainCommunity {
@@ -81,7 +84,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
      * @param blockData - SWSignatureAskBlockTD, the block where the other users are voting on
      * @param responses - the positive responses for your request to join the wallet
      */
-    private fun joinBitcoinWallet(
+    fun joinBitcoinWallet(
         walletBlockData: TrustChainTransaction,
         blockData: SWSignatureAskBlockTD,
         responses: List<SWResponseSignatureBlockTD>,
@@ -248,12 +251,48 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         return serializePacket(MessageId.ALIVE_RESPONSE, payload)
     }
 
+    internal fun createSignPayloadResponse(
+        dAOid: ByteArray,
+        recentSWBlock: TrustChainBlock,
+        proposeBlockData: SWSignatureAskBlockTD,
+        signatures: List<SWResponseSignatureBlockTD>,
+        context: Context
+    ): ByteArray {
+        val payload = SignPayload(dAOid, recentSWBlock, proposeBlockData, signatures, context)
+        return serializePacket(MessageId.SIGNATURE_ASK, payload)
+    }
+
     fun onAliveResponsePacket(packet: Packet){
         val (peer, payload) = packet.getAuthPayload(
             AlivePayload.Deserializer
         )
         this.onAliveResponse(peer, payload)
     }
+
+    fun onSignPayloadResponsePacket(packet: Packet){
+        val (peer, payload) = packet.getAuthPayload(
+            SignPayload.Deserializer
+        )
+        this.onSignPayloadResponse(peer, payload)
+    }
+
+    fun onSignPayloadResponse(peer: Peer, payload: SignPayload){
+        try {
+            joinBitcoinWallet(
+                payload.mostRecentSWBlock.transaction,
+                payload.proposeBlockData,
+                payload.signatures,
+                payload.context
+            )
+            // Add new nonceKey after joining a DAO
+            WalletManagerAndroid.getInstance()
+                .addNewNonceKey(payload.proposeBlockData.SW_UNIQUE_ID, payload.context)
+        } catch (t: Throwable) {
+            Log.e("Coin", "Joining failed. ${t.message ?: "No further information"}.")
+        }
+
+    }
+
     fun onAliveResponse(peer: Peer, payload: AlivePayload) {
         this.getCandidates()[payload.DAOid.decodeToString()]?.add(peer)
     }
@@ -365,10 +404,10 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         sendPayload(getCurrentLeader()[publicKeyBlock.decodeToString()]!!,
             SignPayload(
                 getServiceIdNew().toByteArray(),
-                mostRecentSWBlock.toString().toByteArray(),
-                proposeBlockData.toString().toByteArray(),
-                signatures.toString().toByteArray(),
-                context.toString().toByteArray()
+                mostRecentSWBlock,
+                proposeBlockData,
+                signatures,
+                context
             ).serialize()
         )
 }
@@ -565,6 +604,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         const val ELECTION_REQUEST = 1
         const val ELECTED_RESPONSE = 2
         const val ALIVE_RESPONSE = 3
+        const val SIGNATURE_ASK = 4
     }
 
 

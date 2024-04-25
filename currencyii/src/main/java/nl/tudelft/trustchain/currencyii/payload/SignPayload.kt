@@ -1,27 +1,49 @@
 package nl.tudelft.trustchain.currencyii.payload
+import android.content.Context
 import nl.tudelft.ipv8.messaging.*
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskBlockTD
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWResponseSignatureBlockTD
 
 class SignPayload(
     val DAOid: ByteArray,
-    val mostRecentSWBlock: ByteArray,
-    val proposeBlockData: ByteArray,
-    val signatures: ByteArray,
-    val context: ByteArray
+    val mostRecentSWBlock: TrustChainBlock,
+    val proposeBlockData: SWSignatureAskBlockTD,
+    val signatures: List<SWResponseSignatureBlockTD>,
+    val context: Context
 ) : Serializable {
     override fun serialize(): ByteArray {
+        val gson = Gson()
+
         val daoIdSizeBytes = serializeUShort(DAOid.size)
-        val mostRecentSWBlockSizeBytes = serializeUShort(mostRecentSWBlock.size)
-        val proposeBlockDataSizeBytes = serializeUShort(proposeBlockData.size)
-        val signaturesSizeBytes = serializeUShort(signatures.size)
-        val contextSizeBytes = serializeUShort(context.size)
+
+        val mostRecentSWBlockJson = gson.toJson(mostRecentSWBlock)
+        val mostRecentSWBlockBytes = mostRecentSWBlockJson.toByteArray()
+        val mostRecentSWBlockSizeBytes = serializeUShort(mostRecentSWBlockBytes.size)
+
+        val proposeBlockDataJson = gson.toJson(proposeBlockData)
+        val proposeBlockDataBytes = proposeBlockDataJson.toByteArray()
+        val proposeBlockDataSizeBytes = serializeUShort(proposeBlockDataBytes.size)
+
+        val signaturesJson = gson.toJson(signatures)
+        val signaturesBytes = signaturesJson.toByteArray()
+        val signaturesSizeBytes = serializeUShort(signaturesBytes.size)
+
+        val contextJson = gson.toJson(context)
+        val contextBytes = contextJson.toByteArray()
+        val contextSizeBytes = serializeUShort(contextBytes.size)
+
         return daoIdSizeBytes + DAOid +
-            mostRecentSWBlockSizeBytes + mostRecentSWBlock +
-            proposeBlockDataSizeBytes + proposeBlockData +
-            signaturesSizeBytes + signatures +
-            contextSizeBytes + context
+            mostRecentSWBlockSizeBytes + mostRecentSWBlockBytes +
+            proposeBlockDataSizeBytes + proposeBlockDataBytes +
+            signaturesSizeBytes + signaturesBytes +
+            contextSizeBytes + contextBytes
     }
 
     companion object Deserializer : Deserializable<SignPayload> {
+        val gson = Gson()
         override fun deserialize(
             buffer: ByteArray,
             offset: Int): Pair<SignPayload, Int> {
@@ -33,22 +55,30 @@ class SignPayload(
 
             val mostRecentSWBlockSize = deserializeUShort(buffer, offset + localOffset)
             localOffset += SERIALIZED_USHORT_SIZE
-            val mostRecentSWBlock = buffer.copyOfRange(offset + localOffset, offset + localOffset + mostRecentSWBlockSize)
+            val mostRecentSWBlock =
+                gson.fromJson((buffer.copyOfRange(offset + localOffset, offset + localOffset +
+                    mostRecentSWBlockSize)).decodeToString() , TrustChainBlock::class.java)
             localOffset += mostRecentSWBlockSize
 
             val proposeBlockDataSize = deserializeUShort(buffer, offset + localOffset)
             localOffset += SERIALIZED_USHORT_SIZE
-            val proposeBlockData = buffer.copyOfRange(offset + localOffset, offset + localOffset + proposeBlockDataSize)
+            val proposeBlockData = gson.fromJson(buffer.copyOfRange(offset + localOffset, offset +
+                localOffset + proposeBlockDataSize).decodeToString() , SWSignatureAskBlockTD
+                ::class.java)
             localOffset += proposeBlockDataSize
 
+            val itemType = object : TypeToken<List<SWResponseSignatureBlockTD>>() {}.type
             val signaturesSize = deserializeUShort(buffer, offset + localOffset)
             localOffset += SERIALIZED_USHORT_SIZE
-            val signatures = buffer.copyOfRange(offset + localOffset, offset + localOffset + signaturesSize)
+            val signatures = gson.fromJson<List<SWResponseSignatureBlockTD>>(buffer.copyOfRange(offset + localOffset, offset +
+                localOffset + signaturesSize).decodeToString() , itemType)
             localOffset += signaturesSize
 
             val contextSize = deserializeUShort(buffer, offset + localOffset)
             localOffset += SERIALIZED_USHORT_SIZE
-            val context = buffer.copyOfRange(offset + localOffset, offset + localOffset + contextSize)
+            val context = gson.fromJson(buffer.copyOfRange(offset + localOffset, offset +
+                localOffset + contextSize).decodeToString() , Context
+            ::class.java)
             localOffset += contextSize
 
             return Pair(SignPayload(daoId, mostRecentSWBlock, proposeBlockData, signatures, context), localOffset)
