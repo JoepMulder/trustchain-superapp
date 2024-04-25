@@ -6,10 +6,10 @@ import java.io.ByteArrayInputStream
 import java.io.ObjectInputStream
 
 class ElectedPayload(
-    val publicKey: ByteArray,
+    val DAOid: ByteArray,
 ) : Serializable {
     override fun serialize(): ByteArray {
-        return publicKey
+        return DAOid
     }
 
     companion object Deserializer: Deserializable<ElectedPayload> {

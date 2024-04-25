@@ -18,6 +18,12 @@ import org.junit.jupiter.api.Assertions.*
 
 import com.goterl.lazysodium.LazySodiumJava
 import com.goterl.lazysodium.SodiumJava
+import io.mockk.just
+import io.mockk.runs
+import nl.tudelft.ipv8.IPv4Address
+import nl.tudelft.trustchain.currencyii.payload.ElectionPayload
+import org.junit.Before
+import org.junit.jupiter.api.BeforeAll
 
 class payloadTest {
     @Test
@@ -208,5 +214,143 @@ class LeaderElectionTest {
         verify { spykedCommunity.sendPayload(any(), any()) }
         verify { spykedCommunity.getCandidates() }
 
+    }
+
+
+}
+
+class onElectionpayloadTest() {
+    companion object {
+        lateinit var community: CoinCommunity
+        lateinit var candidates: HashMap<ByteArray, ArrayList<Peer>>
+        lateinit var currentLeader: HashMap<ByteArray, Peer?>
+
+        lateinit var ipv4P1: IPv4Address
+        lateinit var ipv4P2: IPv4Address
+        lateinit var ipv4P3: IPv4Address
+        lateinit var ipv4P4: IPv4Address
+
+
+        lateinit var peer1: Peer
+        lateinit var peer2: Peer
+        lateinit var peer3: Peer
+        lateinit var peer4: Peer
+        val daoID: ByteArray = "x".repeat(64).toByteArray()
+
+
+        @BeforeAll
+        @JvmStatic
+        fun setup() {
+            community = mockk<CoinCommunity>(relaxed = true)
+            candidates = HashMap()
+            currentLeader = HashMap()
+            every { community.getCandidates() } returns candidates
+            every { community.getCurrentLeader() } returns currentLeader
+
+            ipv4P1 = mockk<IPv4Address>()
+            ipv4P2 = mockk<IPv4Address>()
+            ipv4P3 = mockk<IPv4Address>()
+            ipv4P4 = mockk<IPv4Address>()
+
+            peer1 = mockk<Peer>()
+            peer2 = mockk<Peer>()
+            peer3 = mockk<Peer>()
+            peer4 = mockk<Peer>()
+
+            every { ipv4P1.hashCode() } returns 1
+            every { ipv4P2.hashCode() } returns 2
+            every { ipv4P3.hashCode() } returns 3
+            every { ipv4P4.hashCode() } returns 4
+
+            every { peer1.address } returns ipv4P1
+            every { peer2.address } returns ipv4P2
+            every { peer3.address } returns ipv4P3
+            every { peer4.address } returns ipv4P4
+
+            every {
+                community.onElectionRequest(
+                    any(),
+                    any()
+                )
+            } answers { callOriginal() }
+
+            every { community.createAliveResponse(any()) } answers { callOriginal() }
+            every { community.createElectedResponse(any()) } answers { callOriginal() }
+            every { community.sendPayload(any(), any()) } just runs
+
+        }
+    }
+    @Test
+    fun onElectionRequestTestLargest(){
+        every { community.myPeer } returns peer4
+        every { community.getPeers()} answers { listOf(peer1, peer2, peer3)}
+        val alivePacket = community.createAliveResponse(daoID)
+        val electedPacket = community.createElectedResponse(daoID)
+
+        community.onElectionRequest( peer3, ElectionPayload(daoID))
+
+        verify { community.sendPayload(peer3, alivePacket) }
+        verify { community.sendPayload(peer3, electedPacket) }
+        verify { community.getPeers() }
+
+        verify { ipv4P1.hashCode() }
+        verify { ipv4P2.hashCode() }
+        verify { ipv4P3.hashCode() }
+
+        community.getCurrentLeader()[daoID]?.let { assert (it.equals(peer4)) }
+    }
+
+    @Test
+    fun onElectionRequestNotLargestNoReplies(){
+        every { community.myPeer } returns peer2
+        every { community.getPeers()} answers { listOf(peer1, peer3, peer4)}
+
+        val alivePacket = community.createAliveResponse(daoID)
+        val electionPacket = community.createElectionRequest(daoID)
+        val electedPacket = community.createElectedResponse(daoID)
+
+
+        community.onElectionRequest( peer1, ElectionPayload(daoID))
+
+        verify { community.sendPayload(peer1, alivePacket) }
+        verify { community.sendPayload(peer1, electedPacket) }
+
+        verify { community.sendPayload(peer3,electionPacket) }
+        verify { community.sendPayload(peer4,electionPacket) }
+
+        verify { community.getPeers() }
+
+        verify { ipv4P1.hashCode() }
+        verify { ipv4P3.hashCode() }
+        verify { ipv4P4.hashCode() }
+
+        community.getCurrentLeader()[daoID]?.let { assert (it.equals(peer2)) }
+    }
+
+    @Test
+    fun onElectionRequestNotLargestOneReply(){
+        every { community.myPeer } returns peer2
+        every { community.getPeers()} answers { listOf(peer1, peer3, peer4)}
+        candidates[daoID] = ArrayList()
+        candidates[daoID]?.add(peer3)
+        val alivePacket = community.createAliveResponse(daoID)
+        val electionPacket = community.createElectionRequest(daoID)
+        val electedPacket = community.createElectedResponse(daoID)
+
+        community.onElectionRequest( peer1, ElectionPayload(daoID))
+
+        verify { community.sendPayload(peer1, alivePacket) }
+        verify { community.sendPayload(peer1, electedPacket) }
+
+        verify { community.sendPayload(peer3,electionPacket) }
+        verify { community.sendPayload(peer4,electionPacket) }
+
+        verify { community.getPeers() }
+
+        verify { ipv4P1.hashCode() }
+        verify { ipv4P3.hashCode() }
+        verify { ipv4P4.hashCode() }
+
+        assert(community.getCurrentLeader()[daoID] == null)
     }
 }

@@ -21,9 +21,9 @@ import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
 //import nl.tudelft.trustchain.currencyii.util.LeaderElectionHelper
 
 @Suppress("UNCHECKED_CAST")
-class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc8db5899c5df5b") : Community() {
+open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc8db5899c5df5b") : Community() {
     override val serviceId = serviceId
-    private var current_leader: Peer? = null
+    private var currentLeader: HashMap<ByteArray, Peer?> = HashMap()
     private var candidates: HashMap<ByteArray, ArrayList<Peer>> = HashMap()
 
     init {
@@ -259,10 +259,8 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         this.onElectedResponse(peer, payload)
     }
     fun onElectedResponse(peer: Peer, payload: ElectedPayload) {
-        val pair = ElectedPayload.deserialize(payload.serialize(), 0)
         Log.d("LEADER", "Elected: " + peer.publicKey)
-
-        this.current_leader = peer
+        this.currentLeader[payload.DAOid] = peer
     }
 
     fun onElectionRequestPacket(packet: Packet){
@@ -270,6 +268,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
             ElectionPayload.Deserializer, myPeer.key as PrivateKey
         )
         Log.d("Leader", "Election packet received.")
+        getCandidates()[payload.DAOid]  = ArrayList()
         onElectionRequest(peer, payload)
     }
 
@@ -280,13 +279,11 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
 
         Log.d("Leader", "Election started.")
 
-        this.getCandidates()[payload.DAOid]  = ArrayList()
-
-        this.current_leader = null
+        getCurrentLeader()[payload.DAOid] = null
 
         val higherPeers = ArrayList<Peer>()
         for (p in this.getPeers()) {
-            if (p.address.hashCode() > this.myPeer.hashCode()) {
+            if (p.address.hashCode() > this.myPeer.address.hashCode()) {
                 higherPeers.add(p)
             }
         }
@@ -295,7 +292,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         if(higherPeers.isEmpty()) {
             val electedPayload = this.createElectedResponse(payload.DAOid)
             this.sendPayload(peer, electedPayload)
-            this.current_leader = this.myPeer
+            getCurrentLeader()[payload.DAOid] =  this.myPeer
             return
         }
         var lastTime = System.currentTimeMillis()
@@ -312,17 +309,18 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         while (System.currentTimeMillis() - lastTime < 1000) {
             // Wait for responses
         }
-        if(this.candidates[payload.DAOid]?.isNotEmpty() == true){
-            this.current_leader = this.myPeer
+        if(this.candidates[payload.DAOid]?.isEmpty() == true){
+            getCurrentLeader()[payload.DAOid] =  this.myPeer
             val electedPayload = this.createElectedResponse(payload.DAOid)
             this.sendPayload(peer, electedPayload)
         }
-
-        this.myPeer
-
     }
     fun getCandidates(): HashMap<ByteArray, ArrayList<Peer>> {
         return this.candidates
+    }
+
+    fun getCurrentLeader(): HashMap<ByteArray, Peer?> {
+        return this.currentLeader
     }
 
     fun leaderSignProposal(
@@ -345,7 +343,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         }
         Log.e("LEADER", "Leader found.")
         Log.e("LEADER", "sending proposal to leader...")
-        send(this.current_leader!!,
+        send(this.currentLeader[serviceId.toByteArray()]!!,
             SignPayload(
                 serviceId.toByteArray(),
                 mostRecentSWBlock.toString().toByteArray(),
@@ -357,10 +355,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
 }
     private fun checkLeaderExists(): Boolean {
 
-        return this.current_leader == null
-    }
-    fun checkIsLeader(me: Peer): Boolean {
-        return this.current_leader!! == me
+        return this.currentLeader == null
     }
     fun fetchSignatureRequestProposalId(block: TrustChainBlock): String {
         if (block.type == SIGNATURE_ASK_BLOCK) {
