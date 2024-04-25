@@ -65,7 +65,7 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-common-java8:$lifecycle_version"
 
 
-    implementation "com.goterl:lazysodium-java:5.1.4"
+    testImplementation "com.goterl:lazysodium-java:5.1.4"
 
     // Material
     api "com.google.android.material:material:$material_version"

@@ -1,5 +1,6 @@
 package nl.tudelft.trustchain.currencyii.payload
 import nl.tudelft.ipv8.messaging.*
+
 class SignPayload(
     val DAOid: ByteArray,
     val mostRecentSWBlock: ByteArray,
@@ -21,7 +22,9 @@ class SignPayload(
     }
 
     companion object Deserializer : Deserializable<SignPayload> {
-        override fun deserialize(buffer: ByteArray, offset: Int): Pair<SignPayload, Int> {
+        override fun deserialize(
+            buffer: ByteArray,
+            offset: Int): Pair<SignPayload, Int> {
             var localOffset = 0
             val daoIdSize = deserializeUShort(buffer, offset + localOffset)
             localOffset += SERIALIZED_USHORT_SIZE
@@ -52,4 +55,3 @@ class SignPayload(
         }
     }
 }
-

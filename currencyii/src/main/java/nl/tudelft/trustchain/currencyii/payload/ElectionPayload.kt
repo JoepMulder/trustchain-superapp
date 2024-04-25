@@ -9,7 +9,7 @@ class ElectionPayload(
         return DAOid
     }
 
-    companion object Deserializer: Deserializable<ElectionPayload> {
+    companion object Deserializer : Deserializable<ElectionPayload> {
         override fun deserialize(
             buffer: ByteArray,
             offset: Int,

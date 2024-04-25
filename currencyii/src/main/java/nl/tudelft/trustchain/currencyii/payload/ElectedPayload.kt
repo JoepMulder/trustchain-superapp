@@ -1,9 +1,6 @@
 package nl.tudelft.trustchain.currencyii.payload
 
-import nl.tudelft.ipv8.Peer
 import nl.tudelft.ipv8.messaging.*
-import java.io.ByteArrayInputStream
-import java.io.ObjectInputStream
 
 class ElectedPayload(
     val DAOid: ByteArray,
@@ -12,7 +9,7 @@ class ElectedPayload(
         return DAOid
     }
 
-    companion object Deserializer: Deserializable<ElectedPayload> {
+    companion object Deserializer : Deserializable<ElectedPayload> {
         override fun deserialize(
             buffer: ByteArray,
             offset: Int,
