@@ -228,16 +228,14 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
         // Create a new shared wallet using the signatures of the others.
         // Broadcast the new shared bitcoin wallet on trust chain.
         Log.e("LEADER", "requesting signing...")
-        val latestHash =
-            SWSignatureAskTransactionData(block.transaction).getData()
-                .SW_PREVIOUS_BLOCK_HASH
+        val latestHash = block.calculateHash()
 
         getCoinCommunity().leaderSignProposal(
             mostRecentSWBlock,
             proposeBlockData,
             signatures,
             context,
-            latestHash.hexToBytes())
+            latestHash)
 //        try {
 //            getCoinCommunity().joinBitcoinWallet(
 //                mostRecentSWBlock.transaction,

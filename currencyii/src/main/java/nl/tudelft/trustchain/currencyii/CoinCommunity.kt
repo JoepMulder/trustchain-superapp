@@ -23,9 +23,8 @@ import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
 @Suppress("UNCHECKED_CAST")
 open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc8db5899c5df5b") : Community() {
     override val serviceId = serviceId
-    private var currentLeader: HashMap<ByteArray, Peer?> = HashMap()
-    private var candidates: HashMap<ByteArray, ArrayList<Peer>> = HashMap()
-    private val attemptingToJoin: HashSet<ByteArray> = HashSet()
+    private var currentLeader: HashMap<String, Peer?> = HashMap()
+    private var candidates: HashMap<String, ArrayList<Peer>> = HashMap()
     init {
         messageHandlers[MessageId.ELECTION_REQUEST] = ::onElectionRequestPacket
         messageHandlers[MessageId.ELECTED_RESPONSE] = ::onElectedResponsePacket
@@ -255,7 +254,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         this.onAliveResponse(peer, payload)
     }
     fun onAliveResponse(peer: Peer, payload: AlivePayload) {
-        this.getCandidates()[payload.DAOid]?.add(peer)
+        this.getCandidates()[payload.DAOid.decodeToString()]?.add(peer)
     }
     fun onElectedResponsePacket(packet: Packet){
         val (peer, payload) = packet.getAuthPayload(
@@ -265,7 +264,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
     }
     fun onElectedResponse(peer: Peer, payload: ElectedPayload) {
         Log.d("LEADER", "Elected: " + peer.publicKey)
-        this.currentLeader[payload.DAOid] = peer
+        getCurrentLeader()[payload.DAOid.decodeToString()] = peer
     }
 
     fun onElectionRequestPacket(packet: Packet){
@@ -273,7 +272,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
             ElectionPayload.Deserializer
         )
         Log.d("Leader", "Election packet received.")
-        getCandidates()[payload.DAOid]  = ArrayList()
+        getCandidates()[payload.DAOid.decodeToString()]  = ArrayList()
         onElectionRequest(peer, payload)
     }
 
@@ -293,7 +292,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
 
         Log.d("Leader", "Election started.")
 
-        getCurrentLeader()[payload.DAOid] = null
+        getCurrentLeader()[payload.DAOid.decodeToString()] = null
 
         val higherPeers = ArrayList<Peer>()
         for (p in this.getPeers()) {
@@ -306,7 +305,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         if(higherPeers.isEmpty()) {
             val electedPayload = this.createElectedResponse(payload.DAOid)
             this.sendPayload(peer, electedPayload)
-            getCurrentLeader()[payload.DAOid] =  this.myPeer
+            getCurrentLeader()[payload.DAOid.decodeToString()] =  this.myPeer
             return
         }
         var lastTime = System.currentTimeMillis()
@@ -323,17 +322,17 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         while (System.currentTimeMillis() - lastTime < 1000) {
             // Wait for responses
         }
-        if(this.candidates[payload.DAOid]?.isEmpty() == true){
-            getCurrentLeader()[payload.DAOid] =  this.myPeer
+        if(this.candidates[payload.DAOid.decodeToString()]?.isEmpty() == true){
+            getCurrentLeader()[payload.DAOid.decodeToString()] =  this.myPeer
             val electedPayload = this.createElectedResponse(payload.DAOid)
             this.sendPayload(peer, electedPayload)
         }
     }
-    fun getCandidates(): HashMap<ByteArray, ArrayList<Peer>> {
+    fun getCandidates(): HashMap<String, ArrayList<Peer>> {
         return this.candidates
     }
 
-    fun getCurrentLeader(): HashMap<ByteArray, Peer?> {
+    fun getCurrentLeader(): HashMap<String, Peer?> {
         return this.currentLeader
     }
     fun getServiceIdNew(): String{
@@ -360,7 +359,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         }
         Log.d("LEADER", "Leader found.")
         Log.d("LEADER", "sending proposal to leader...")
-        sendPayload(getCurrentLeader()[publicKeyBlock]!!,
+        sendPayload(getCurrentLeader()[publicKeyBlock.decodeToString()]!!,
             SignPayload(
                 getServiceIdNew().toByteArray(),
                 mostRecentSWBlock.toString().toByteArray(),
@@ -371,7 +370,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         )
 }
     private fun checkLeaderExists(dAOid: ByteArray): Boolean {
-        return getCurrentLeader()[dAOid] != null
+        return getCurrentLeader()[dAOid.decodeToString()] != null
     }
     fun fetchSignatureRequestProposalId(block: TrustChainBlock): String {
         if (block.type == SIGNATURE_ASK_BLOCK) {
