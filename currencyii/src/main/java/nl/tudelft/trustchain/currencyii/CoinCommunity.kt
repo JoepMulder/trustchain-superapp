@@ -223,6 +223,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         peer: Peer,
         payload: ByteArray
     ) {
+        Log.i("CoinCommunitySending", "Sending payload to ${peer.address}")
         send(
             peer,
             payload
@@ -303,6 +304,8 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         Log.d("Leader", "peers with higher ips:$higherPeers")
 
         if(higherPeers.isEmpty()) {
+            Log.d("Leader", "Elected: " + this.myPeer.publicKey)
+
             val electedPayload = this.createElectedResponse(payload.DAOid)
             this.sendPayload(peer, electedPayload)
             getCurrentLeader()[payload.DAOid.decodeToString()] =  this.myPeer
