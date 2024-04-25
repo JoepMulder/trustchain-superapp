@@ -1,5 +1,6 @@
 package nl.tudelft.trustchain.currencyii.leaderElection
 
+import android.content.Context
 import io.mockk.every
 import nl.tudelft.ipv8.Peer
 import nl.tudelft.trustchain.currencyii.CoinCommunity
@@ -18,10 +19,15 @@ import org.junit.jupiter.api.Assertions.*
 
 import com.goterl.lazysodium.LazySodiumJava
 import com.goterl.lazysodium.SodiumJava
+import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.just
 import io.mockk.runs
 import nl.tudelft.ipv8.IPv4Address
+import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.trustchain.currencyii.payload.ElectionPayload
+import nl.tudelft.trustchain.currencyii.payload.SignPayload
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWResponseSignatureBlockTD
+import nl.tudelft.trustchain.currencyii.sharedWallet.SWSignatureAskBlockTD
 import org.junit.Before
 import org.junit.jupiter.api.BeforeAll
 
@@ -354,3 +360,90 @@ class onElectionpayloadTest() {
         assert(community.getCurrentLeader()[daoID] == null)
     }
 }
+
+//class leaderSignProposalTests(){
+//
+//
+//    companion object {
+//
+//        lateinit var currentLeader: HashMap<ByteArray, Peer?>
+//        lateinit var community: CoinCommunity
+//
+//        lateinit var mostRecentSWBlock: TrustChainBlock
+//        lateinit var proposeBlockData: SWSignatureAskBlockTD
+//        lateinit var signatures: List<SWResponseSignatureBlockTD>
+//        lateinit var context: Context
+//
+//
+//        lateinit var peer1: Peer
+//        lateinit var peer2: Peer
+//        lateinit var peer3: Peer
+//        lateinit var peer4: Peer
+//        val daoID: ByteArray = "x".repeat(64).toByteArray()
+//
+//        val mostRecentSWBlockArray: String = "y".repeat(64)
+//        val proposeBlockDataArray: String = "p".repeat(64)
+//        val contextArray: String = "c".repeat(64)
+//
+//        val electionPacket: ByteArray = "e".repeat(64).toByteArray()
+//
+//        @BeforeAll
+//        @JvmStatic
+//        fun setup() {
+//            community = mockk<CoinCommunity>(relaxed = true)
+//
+//            peer1 = mockk<Peer>()
+//            peer2 = mockk<Peer>()
+//            peer3 = mockk<Peer>()
+//            peer4 = mockk<Peer>()
+//
+//            mostRecentSWBlock = mockk<TrustChainBlock>()
+//            proposeBlockData = mockk<SWSignatureAskBlockTD>()
+//            signatures = emptyList()
+//            context = mockk<Context>()
+//
+//            every { mostRecentSWBlock.toString() } returns mostRecentSWBlockArray
+//            every { proposeBlockData.toString() } returns proposeBlockDataArray
+//            every { context.toString() } returns contextArray
+//            every { community.serviceId } returns "02313685c1912a141279f8248fc8db5899c5df5b"
+//
+//
+//            every { community.sendPayload(any(), any()) } just runs
+//
+//            currentLeader = HashMap()
+//            every { community.getCurrentLeader() } returns currentLeader
+//
+//            every {
+//                community.createElectionRequest(
+//                    any()
+//                )
+//            } returns electionPacket
+//        }
+//    }
+//
+//    @Test
+//    fun leaderSingProposalTest(){
+//
+//        val payload = SignPayload(
+//                    community.serviceId.toByteArray(),
+//                    mostRecentSWBlock.toString().toByteArray(),
+//                    proposeBlockData.toString().toByteArray(),
+//                    signatures.toString().toByteArray(),
+//                    context.toString().toByteArray()
+//                ).serialize()
+//
+//        currentLeader[daoID] = peer4
+//        every { community.getPeers()} answers { listOf(peer1, peer3, peer4)}
+//
+//        community.leaderSignProposal(mostRecentSWBlock, proposeBlockData, signatures, context, daoID)
+//
+//        verify { community.sendPayload(peer1, electionPacket) }
+//        verify { community.sendPayload(peer3, electionPacket) }
+//        verify { community.sendPayload(peer4, electionPacket) }
+//
+//        verify { community.sendPayload(peer4, payload) }
+//
+//
+//
+//    }
+//}

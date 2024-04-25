@@ -330,20 +330,20 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         context: Context,
         publicKeyBlock: ByteArray
     ) {
-        Log.e("LEADER", "Leader doesn't exists.")
-        Log.e("LEADER", "Requesting election...")
-        val peers = getPeers()
+        Log.i("LEADER", "Leader doesn't exists.")
+        Log.i("LEADER", "Requesting election...")
+        val peers = this.getPeers()
         for (peer in peers) {
-            send(peer, this.createElectionRequest(publicKeyBlock))
-            Log.e("LEADER", "Sending to peer at " + peer.address + " in " + serviceId + "...")
+            sendPayload(peer, this.createElectionRequest(publicKeyBlock))
+            Log.d("LEADER", "Sending to peer at " + peer.address + " in " + serviceId + "...")
         }
-        Log.e("LEADER", "Waiting for leader...")
-        while (!this.checkLeaderExists()) {
+        Log.i("LEADER", "Waiting for leader...")
+        while (!this.checkLeaderExists(publicKeyBlock)) {
             Thread.sleep(1000)
         }
-        Log.e("LEADER", "Leader found.")
-        Log.e("LEADER", "sending proposal to leader...")
-        send(this.currentLeader[serviceId.toByteArray()]!!,
+        Log.i("LEADER", "Leader found.")
+        Log.i("LEADER", "sending proposal to leader...")
+        sendPayload(getCurrentLeader()[publicKeyBlock]!!,
             SignPayload(
                 serviceId.toByteArray(),
                 mostRecentSWBlock.toString().toByteArray(),
@@ -353,9 +353,8 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
             ).serialize()
         )
 }
-    private fun checkLeaderExists(): Boolean {
-
-        return this.currentLeader == null
+    private fun checkLeaderExists(dAOid: ByteArray): Boolean {
+        return getCurrentLeader()[dAOid] == null
     }
     fun fetchSignatureRequestProposalId(block: TrustChainBlock): String {
         if (block.type == SIGNATURE_ASK_BLOCK) {
