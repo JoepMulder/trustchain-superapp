@@ -10,17 +10,14 @@ import nl.tudelft.ipv8.android.IPv8Android
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainBlock
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainCommunity
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
-import nl.tudelft.ipv8.keyvault.PrivateKey
 import nl.tudelft.ipv8.messaging.Packet
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
-import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.payload.*
 import nl.tudelft.trustchain.currencyii.sharedWallet.*
 import nl.tudelft.trustchain.currencyii.util.DAOCreateHelper
 import nl.tudelft.trustchain.currencyii.util.DAOJoinHelper
 import nl.tudelft.trustchain.currencyii.util.DAOTransferFundsHelper
-// import nl.tudelft.trustchain.currencyii.util.LeaderElectionHelper
 
 @Suppress("UNCHECKED_CAST")
 open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc8db5899c5df5b") : Community() {
@@ -255,10 +252,9 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         dAOid: ByteArray,
         recentSWBlock: TrustChainBlock,
         proposeBlockData: SWSignatureAskBlockTD,
-        signatures: List<SWResponseSignatureBlockTD>,
-        context: Context
+        signatures: List<SWResponseSignatureBlockTD>
     ): ByteArray {
-        val payload = SignPayload(dAOid, recentSWBlock, proposeBlockData, signatures, context)
+        val payload = SignPayload(dAOid, recentSWBlock, proposeBlockData, signatures)
         return serializePacket(MessageId.SIGNATURE_ASK, payload)
     }
 
@@ -277,19 +273,19 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
     }
 
     fun onSignPayloadResponse(peer: Peer, payload: SignPayload){
-        try {
-            joinBitcoinWallet(
-                payload.mostRecentSWBlock.transaction,
-                payload.proposeBlockData,
-                payload.signatures,
-                payload.context
-            )
-            // Add new nonceKey after joining a DAO
-            WalletManagerAndroid.getInstance()
-                .addNewNonceKey(payload.proposeBlockData.SW_UNIQUE_ID, payload.context)
-        } catch (t: Throwable) {
-            Log.e("Coin", "Joining failed. ${t.message ?: "No further information"}.")
-        }
+        //TODO: Implement adding to the wallet without a Context
+//        try {
+//            joinBitcoinWallet(
+//                payload.mostRecentSWBlock.transaction,
+//                payload.proposeBlockData,
+//                payload.signatures
+//            )
+//            // Add new nonceKey after joining a DAO
+//            WalletManagerAndroid.getInstance()
+//                .addNewNonceKey(payload.proposeBlockData.SW_UNIQUE_ID)
+//        } catch (t: Throwable) {
+//            Log.e("Coin", "Joining failed. ${t.message ?: "No further information"}.")
+//        }
 
     }
 
@@ -316,15 +312,20 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         onElectionRequest(peer, payload)
     }
 
-    fun onElectionRequest(peer: Peer, payload:ElectionPayload) {
-
-        val mostRecentWalletBlock = fetchLatestSharedWalletBlock(payload.DAOid)
+    fun getPeersPKInDao(DAOid: ByteArray): ArrayList<String>{
+        val mostRecentWalletBlock = fetchLatestSharedWalletBlock(DAOid)
             ?: throw IllegalStateException("Most recent DAO block not found")
         val peerPK: ArrayList<String> = ArrayList<String>()
         val blockData = SWJoinBlockTransactionData(mostRecentWalletBlock.transaction).getData()
         for (swParticipantPk in blockData.SW_TRUSTCHAIN_PKS) {
             peerPK.add(swParticipantPk)
         }
+        return peerPK
+    }
+
+    fun onElectionRequest(peer: Peer, payload:ElectionPayload) {
+
+        val peerPK = getPeersPKInDao(payload.DAOid)
 
         Log.d("Leader", "Election started.")
         val aliveResponse = this.createAliveResponse(payload.DAOid)
@@ -336,7 +337,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
 
         val higherPeers = ArrayList<Peer>()
         for (p in this.getPeers()) {
-            if (peerPK.contains(p.publicKey.keyToBin().toString()) && p.address.hashCode() > this.myPeer.address.hashCode()) {
+            if (peerPK.contains(p.publicKey.keyToBin().decodeToString()) && p.address.hashCode() > this.myPeer.address.hashCode()) {
                 higherPeers.add(p)
             }
         }
@@ -385,7 +386,6 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         mostRecentSWBlock: TrustChainBlock,
         proposeBlockData: SWSignatureAskBlockTD,
         signatures: List<SWResponseSignatureBlockTD>,
-        context: Context,
         publicKeyBlock: ByteArray
     ) {
         Log.d("LEADER", "Leader doesn't exists.")
@@ -406,8 +406,7 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
                 getServiceIdNew().toByteArray(),
                 mostRecentSWBlock,
                 proposeBlockData,
-                signatures,
-                context
+                signatures
             ).serialize()
         )
 }

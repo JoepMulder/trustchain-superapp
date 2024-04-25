@@ -235,8 +235,25 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
             mostRecentSWBlock,
             proposeBlockData,
             signatures,
-            context,
             latestHash)
+//
+        try {
+            getCoinCommunity().joinBitcoinWallet(
+                mostRecentSWBlock.transaction,
+                proposeBlockData,
+                signatures,
+                context
+            )
+            // Add new nonceKey after joining a DAO
+            WalletManagerAndroid.getInstance()
+                .addNewNonceKey(proposeBlockData.SW_UNIQUE_ID, context)
+        } catch (t: Throwable) {
+            Log.e("Coin", "Joining failed. ${t.message ?: "No further information"}.")
+            setAlertText(t.message ?: "Unexpected error occurred. Try again")
+        }
+
+        // Update wallets UI list
+        fetchSharedWalletsAndUpdateUI()
     }
 
     /**
