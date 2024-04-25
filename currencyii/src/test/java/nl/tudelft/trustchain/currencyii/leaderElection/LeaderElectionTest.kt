@@ -139,29 +139,74 @@ class LeaderElectionTest {
     }
     @Test
     fun onAlivePacketTest() {
-
         init()
-
         community.messageHandlers[CoinCommunity.MessageId.ALIVE_RESPONSE] = handler
-
         community.createAliveResponse(
-            "dao_id".toByteArray()
+            "x".repeat(64).toByteArray()
         ).let { packet ->
             community.onPacket(Packet(myPeer.address, packet))
         }
         verify { handler(any()) }
     }
-
     @Test
     fun handleAlivePacketTest() {
 
         init()
         val spykedCommunity = spyk(community)
         spykedCommunity.createAliveResponse(
-            "dao_id".toByteArray()
+            "x".repeat(64).toByteArray()
         ).let { packet ->
-            spykedCommunity.onAliveResponsePacket(Packet(myPeer.address, packet))
+            println(packet.size); spykedCommunity.onAliveResponsePacket(Packet(myPeer.address, packet))
         }
         verify { spykedCommunity.onAliveResponse(any(), any()) }
+        verify { spykedCommunity.getCandidates()}
+    }
+    @Test
+    fun onElectedPacketTest() {
+        init()
+        community.messageHandlers[CoinCommunity.MessageId.ELECTED_RESPONSE] = handler
+        community.createElectedResponse(
+            "x".repeat(64).toByteArray()
+        ).let { packet ->
+            community.onPacket(Packet(myPeer.address, packet))
+        }
+        verify { handler(any()) }
+    }
+    @Test
+    fun handleElectedPacketTest() {
+        init()
+        val spykedCommunity = spyk(community)
+        spykedCommunity.createElectedResponse(
+            "x".repeat(64).toByteArray()
+        ).let { packet ->
+            println(packet.size); spykedCommunity.onElectedResponsePacket(Packet(myPeer.address, packet))
+        }
+        verify { spykedCommunity.onElectedResponse(any(), any()) }
+    }
+    @Test
+    fun onElectionPacketTest() {
+        init()
+        community.messageHandlers[CoinCommunity.MessageId.ELECTION_REQUEST] = handler
+        community.createElectionRequest(
+            "x".repeat(64).toByteArray()
+        ).let { packet ->
+            community.onPacket(Packet(myPeer.address, packet))
+        }
+        verify { handler(any()) }
+    }
+    @Test
+    fun handleElectionPacketTest() {
+        init()
+        val spykedCommunity = spyk(community)
+        spykedCommunity.createElectedResponse(
+            "x".repeat(64).toByteArray()
+        ).let { packet ->
+            println(packet.size); spykedCommunity.onElectionRequestPacket(Packet(myPeer.address, packet))
+        }
+        verify { spykedCommunity.onElectionRequest(any(), any()) }
+        verify { spykedCommunity.createAliveResponse(any()) }
+        verify { spykedCommunity.sendPayload(any(), any()) }
+        verify { spykedCommunity.getCandidates() }
+
     }
 }

@@ -6,10 +6,10 @@ import java.io.ByteArrayInputStream
 import java.io.ObjectInputStream
 
 class ElectedPayload(
-    val DAOid: ByteArray,
+    val publicKey: ByteArray,
 ) : Serializable {
     override fun serialize(): ByteArray {
-        return serializeUShort(DAOid.size) + DAOid
+        return publicKey
     }
 
     companion object Deserializer: Deserializable<ElectedPayload> {
@@ -17,23 +17,15 @@ class ElectedPayload(
             buffer: ByteArray,
             offset: Int,
         ): Pair<ElectedPayload, Int> {
+//            var localOffset = 0
+//            val payloadSize = deserializeUShort(buffer, offset)
+//            localOffset += SERIALIZED_USHORT_SIZE
+//            val publicKey = buffer.copyOfRange(offset + localOffset, offset + localOffset + payloadSize)
+//            localOffset += payloadSize
             var localOffset = 0
-            val payloadSize = deserializeUShort(buffer, offset)
-            localOffset += SERIALIZED_USHORT_SIZE
-            val publicKey = buffer.copyOfRange(offset + localOffset, offset + localOffset + payloadSize)
-            localOffset += payloadSize
+            val (publicKey, publicKeyLen) = deserializeRaw(buffer, offset + localOffset)
+            localOffset += publicKeyLen
             return Pair(ElectedPayload(publicKey), localOffset)
-        }
-        fun deserializeBytes(buffer: ByteArray, offset: Int): Integer {
-            val pair = deserialize(buffer, offset)
-            val daoIdBytes = pair.first.DAOid
-
-            val daoId = ByteArrayInputStream(daoIdBytes).use { bis ->
-                ObjectInputStream(bis).use { ois ->
-                    ois.readObject() as Integer
-                }
-            }
-            return daoId
         }
     }
 }

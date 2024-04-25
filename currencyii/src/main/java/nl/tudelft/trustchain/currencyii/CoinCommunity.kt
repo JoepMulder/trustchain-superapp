@@ -11,10 +11,8 @@ import nl.tudelft.ipv8.attestation.trustchain.TrustChainCommunity
 import nl.tudelft.ipv8.attestation.trustchain.TrustChainTransaction
 import nl.tudelft.ipv8.keyvault.PrivateKey
 import nl.tudelft.ipv8.messaging.Packet
-import nl.tudelft.ipv8.peerdiscovery.Network
 import nl.tudelft.ipv8.util.hexToBytes
 import nl.tudelft.ipv8.util.toHex
-import nl.tudelft.trustchain.currencyii.coin.WalletManagerAndroid
 import nl.tudelft.trustchain.currencyii.payload.*
 import nl.tudelft.trustchain.currencyii.sharedWallet.*
 import nl.tudelft.trustchain.currencyii.util.DAOCreateHelper
@@ -252,22 +250,22 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
         this.onAliveResponse(peer, payload)
     }
     fun onAliveResponse(peer: Peer, payload: AlivePayload) {
-        this.candidates[payload.DAOid]?.add(peer)
+        this.getCandidates()[payload.DAOid]?.add(peer)
     }
-    private fun onElectedResponsePacket(packet: Packet){
+    fun onElectedResponsePacket(packet: Packet){
         val (peer, payload) = packet.getDecryptedAuthPayload(
             ElectedPayload.Deserializer, myPeer.key as PrivateKey
         )
         this.onElectedResponse(peer, payload)
     }
-    private fun onElectedResponse(peer: Peer, payload: ElectedPayload) {
-        val pair = ElectedPayload.deserializeBytes(payload.serialize(), 0)
+    fun onElectedResponse(peer: Peer, payload: ElectedPayload) {
+        val pair = ElectedPayload.deserialize(payload.serialize(), 0)
         Log.d("LEADER", "Elected: " + peer.publicKey)
 
         this.current_leader = peer
     }
 
-    private fun onElectionRequestPacket(packet: Packet){
+    fun onElectionRequestPacket(packet: Packet){
         val (peer, payload) = packet.getDecryptedAuthPayload(
             ElectionPayload.Deserializer, myPeer.key as PrivateKey
         )
@@ -282,7 +280,7 @@ class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8248fc
 
         Log.d("Leader", "Election started.")
 
-        this.candidates[payload.DAOid]  = ArrayList()
+        this.getCandidates()[payload.DAOid]  = ArrayList()
 
         this.current_leader = null
 
