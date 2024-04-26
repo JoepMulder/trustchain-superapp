@@ -216,7 +216,6 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
                 setAlertText(t.message ?: "Unexpected error occurred. Try again")
                 return
             }
-
         val context = requireContext()
         // Wait and collect signatures
         var signatures: List<SWResponseSignatureBlockTD>? = null
@@ -227,6 +226,16 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
 
         // Create a new shared wallet using the signatures of the others.
         // Broadcast the new shared bitcoin wallet on trust chain.
+        Log.e("LEADER", "requesting signing...")
+        val latestHash = block.calculateHash()
+
+        getCoinCommunity().leaderSignProposal(
+            mostRecentSWBlock,
+            proposeBlockData,
+            signatures,
+            latestHash
+        )
+
         try {
             getCoinCommunity().joinBitcoinWallet(
                 mostRecentSWBlock.transaction,
@@ -244,7 +253,6 @@ class JoinDAOFragment : BaseFragment(R.layout.fragment_join_network) {
 
         // Update wallets UI list
         fetchSharedWalletsAndUpdateUI()
-        setAlertText("You joined ${proposeBlockData.SW_UNIQUE_ID}!")
     }
 
     /**
