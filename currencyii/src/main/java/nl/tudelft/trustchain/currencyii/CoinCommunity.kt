@@ -407,9 +407,13 @@ open class CoinCommunity constructor(serviceId: String = "02313685c1912a141279f8
         Log.d("LEADER", "Leader doesn't exists.")
         Log.d("LEADER", "Requesting election...")
         val peers = this.getPeers()
+        val peerPK = getPeersPKInDao(publicKeyBlock)
         for (peer in peers) {
-            sendPayload(peer, this.createElectionRequest(publicKeyBlock))
-            Log.d("LEADER", "Sending to peer at " + peer.address + " in " + serviceId + "...")
+            if (peerPK.contains(peer.publicKey.keyToBin().decodeToString())) {
+                sendPayload(peer, this.createElectionRequest(publicKeyBlock))
+                Log.d("LEADER", "Sending to peer at " + peer.address + " in " + serviceId + "...")
+            }
+
         }
         Log.d("LEADER", "Waiting for leader...")
         while (!this.checkLeaderExists(publicKeyBlock)) {
